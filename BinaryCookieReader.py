@@ -13,8 +13,17 @@
 
 import sys
 from struct import unpack
-from io import BytesIO, TextIOWrapper
+from io import BytesIO
 from time import strftime, gmtime
+import functools
+import itertools
+
+# Adapted from https://stackoverflow.com/questions/32774910/clean-way-to-read-a-null-terminated-c-style-string-from-a-file
+def readcstr(f, offset):
+    f.seek(offset)
+    toeof = iter(functools.partial(f.read, 1), b'')
+    return b''.join(itertools.takewhile(b'\0'.__ne__, toeof)).decode()
+
 
 if len(sys.argv)!=2:
     print("\nUsage: Python BinaryCookieReader.py [Full path to Cookies.binarycookies file] \n")
@@ -96,21 +105,11 @@ for page in pages:
                 
         create_date_epoch=unpack('<d',cookie.read(8))[0]+978307200           #Cookies creation time
         create_date=strftime("%a, %d %b %Y ",gmtime(create_date_epoch))[:-1]
-        #print create_date
 
-        cookie_text = TextIOWrapper(cookie)
-        
-        cookie_text.seek(urloffset-4)                            #fetch domaain value from url offset
-        url = cookie_text.read()
-
-        cookie_text.seek(nameoffset-4)                           #fetch cookie name from name offset
-        name = cookie_text.read()
-                
-        cookie_text.seek(pathoffset-4)                          #fetch cookie path from path offset
-        path = cookie_text.read()
-                
-        cookie_text.seek(valueoffset-4)                         #fetch cookie value from value offset
-        value = cookie_text.read()
+        url = readcstr(cookie, urloffset-4)     #fetch domain value from url offset
+        name = readcstr(cookie, nameoffset-4)   #fetch cookie name from name offset
+        path = readcstr(cookie, pathoffset-4)   #fetch cookie path from path offset
+        value = readcstr(cookie, valueoffset-4) #fetch cookie value from value offset
         
         print('Cookie : '+name+'='+value+'; domain='+url+'; path='+path+'; '+'expires='+expiry_date+'; '+cookie_flags)
         
